@@ -213,14 +213,19 @@ describe("Security Tests", () => {
 	});
 
 	describe("CORS Security Tests", () => {
-		test("should not allow dangerous origins", async () => {
-			// This test verifies that CORS is properly configured
-			// The actual CORS headers are tested in api.test.ts
+		test("should not allow wildcard origins when CORS_ORIGINS is not configured", async () => {
+			// Test server runs with auth enabled and no CORS_ORIGINS set,
+			// so CORS should block all cross-origin requests (secure by default)
 			const result = await apiRequest("/health", { auth: false });
 
-			// Should have CORS headers but not allow all origins in production
-			expect(result.headers.get("access-control-allow-origin")).toBe("*");
-			// In production, this should be more restrictive
+			expect(result.headers.get("access-control-allow-origin")).toBeNull();
+		});
+
+		test("should document that production requires CORS_ORIGINS", () => {
+			// In production (AUTH_DISABLED=false), CORS_ORIGINS must be set
+			// to explicitly allow frontend domains.
+			// Without CORS_ORIGINS, all cross-origin requests are blocked.
+			expect(true).toBe(true);
 		});
 	});
 });

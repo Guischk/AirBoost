@@ -6,6 +6,7 @@
 import { swagger } from "@elysiajs/swagger";
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
+import { config } from "../config";
 import { loggers } from "../lib/logger";
 
 // Import endpoints
@@ -56,7 +57,8 @@ export function createApp(worker?: Worker) {
 			cors({
 				methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
 				allowedHeaders: ["Content-Type", "Authorization"],
-				origin: true,
+				origin:
+					config.corsOrigins.length > 0 ? config.corsOrigins : config.authDisabled ? true : false,
 				preflight: true,
 			}),
 		)

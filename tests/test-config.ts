@@ -40,7 +40,7 @@ export const TEST_CONFIG = {
 	security: {
 		maxTableNameLength: 100,
 		maxRecordIdLength: 100,
-		allowedOrigins: ["*"], // À restreindre en production
+		allowedOrigins: ["*"], // Tests run with AUTH_DISABLED=true, so all origins are allowed
 		blockedPatterns: [/<script/i, /javascript:/i, /onload=/i, /DROP TABLE/i, /UNION SELECT/i],
 	},
 

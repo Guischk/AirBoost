@@ -483,10 +483,12 @@ describe("Aircache API Tests", () => {
 	});
 
 	describe("CORS Headers", () => {
-		test("should include CORS headers", async () => {
+		test("should restrict CORS when CORS_ORIGINS is not configured", async () => {
+			// Test server runs with auth enabled and no CORS_ORIGINS set,
+			// so CORS should be restrictive (no wildcard Access-Control-Allow-Origin)
 			const result = await apiRequest("/health", { auth: false });
 
-			expect(result.headers.get("access-control-allow-origin")).toBe("*");
+			expect(result.headers.get("access-control-allow-origin")).toBeNull();
 		});
 
 		test("should handle OPTIONS requests", async () => {

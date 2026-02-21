@@ -38,6 +38,9 @@ export interface Config {
 	webhookAutoSetup: boolean;
 	webhookPublicUrl: string;
 
+	// CORS settings
+	corsOrigins: string[];
+
 	// Logger settings
 	logLevel: number;
 	logFancy: boolean;
@@ -107,6 +110,13 @@ export function loadConfig(): Config {
 		webhookIdempotencyTTL: Number.parseInt(process.env.WEBHOOK_IDEMPOTENCY_TTL || "86400"), // 24 hours
 		webhookAutoSetup: process.env.WEBHOOK_AUTO_SETUP !== "false", // Default to true
 		webhookPublicUrl,
+
+		// CORS settings
+		corsOrigins: process.env.CORS_ORIGINS
+			? process.env.CORS_ORIGINS.split(",")
+					.map((o) => o.trim())
+					.filter(Boolean)
+			: [],
 
 		// Logger settings
 		logLevel: Number.parseInt(process.env.CONSOLA_LEVEL || "3"), // 3 = info level
