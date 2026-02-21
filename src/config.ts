@@ -46,7 +46,7 @@ export function loadConfig(): Config {
 	// Required environment variables
 	const airtableToken = process.env.AIRTABLE_PERSONAL_TOKEN;
 	const airtableBaseId = process.env.AIRTABLE_BASE_ID;
-	const bearerToken = process.env.BEARER_TOKEN;
+	const bearerToken = process.env.BEARER_TOKEN?.trim();
 
 	if (!airtableToken || !airtableBaseId || !bearerToken) {
 		throw new Error(

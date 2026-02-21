@@ -1,21 +1,16 @@
 import { bearer } from "@elysiajs/bearer";
 import { Elysia } from "elysia";
+import { config } from "../../config";
 
 /**
  * Bearer Token Authentication Middleware
  * Securely compares the Authorization header with the configured token
+ * Note: config.bearerToken is guaranteed non-empty by loadConfig() validation
  */
 export const bearerAuth = new Elysia({ name: "bearerAuth" })
 	.use(bearer())
 	.derive({ as: "global" }, async ({ bearer, set }) => {
-		const bearerToken = process.env.BEARER_TOKEN;
-
-		// Skip if no token configured (dev mode or open access)
-		if (!bearerToken || bearerToken.trim() === "") {
-			return {
-				user: "anonymous",
-			};
-		}
+		const bearerToken = config.bearerToken;
 
 		if (!bearer) {
 			set.status = 401;
