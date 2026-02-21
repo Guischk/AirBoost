@@ -15,6 +15,7 @@ export interface Config {
 
 	// API settings
 	bearerToken: string;
+	authDisabled: boolean;
 
 	// Sync mode settings
 	syncMode: SyncMode;
@@ -47,13 +48,20 @@ export function loadConfig(): Config {
 	const airtableToken = process.env.AIRTABLE_PERSONAL_TOKEN;
 	const airtableBaseId = process.env.AIRTABLE_BASE_ID;
 	const bearerToken = process.env.BEARER_TOKEN?.trim();
+	const authDisabled = process.env.AUTH_DISABLED === "true";
 
-	if (!airtableToken || !airtableBaseId || !bearerToken) {
+	if (!airtableToken || !airtableBaseId) {
 		throw new Error(
 			"Missing required environment variables. Please set:\n" +
 				"- AIRTABLE_PERSONAL_TOKEN\n" +
-				"- AIRTABLE_BASE_ID\n" +
-				"- BEARER_TOKEN",
+				"- AIRTABLE_BASE_ID",
+		);
+	}
+
+	if (!authDisabled && !bearerToken) {
+		throw new Error(
+			"Missing required environment variable: BEARER_TOKEN\n" +
+				"Set BEARER_TOKEN to secure your API, or set AUTH_DISABLED=true for development only.",
 		);
 	}
 
@@ -77,7 +85,8 @@ export function loadConfig(): Config {
 		port: Number.parseInt(process.env.PORT || "3000"),
 		airtableToken,
 		airtableBaseId,
-		bearerToken,
+		bearerToken: bearerToken || "",
+		authDisabled,
 
 		// Sync mode
 		syncMode,

@@ -1,15 +1,27 @@
 import { bearer } from "@elysiajs/bearer";
 import { Elysia } from "elysia";
 import { config } from "../../config";
+import { loggers } from "../../lib/logger";
+
+const log = loggers.auth;
+
+if (config.authDisabled) {
+	log.warn("Authentication is DISABLED (AUTH_DISABLED=true). All routes are publicly accessible.");
+}
 
 /**
  * Bearer Token Authentication Middleware
- * Securely compares the Authorization header with the configured token
- * Note: config.bearerToken is guaranteed non-empty by loadConfig() validation
+ * Securely compares the Authorization header with the configured token.
+ * Anonymous access is only allowed when AUTH_DISABLED=true (development).
  */
 export const bearerAuth = new Elysia({ name: "bearerAuth" })
 	.use(bearer())
 	.derive({ as: "global" }, async ({ bearer, set }) => {
+		// Allow anonymous access only when explicitly disabled via AUTH_DISABLED=true
+		if (config.authDisabled) {
+			return { user: "anonymous" };
+		}
+
 		const bearerToken = config.bearerToken;
 
 		if (!bearer) {
