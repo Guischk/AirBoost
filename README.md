@@ -4,7 +4,7 @@
 
 **High-performance SQLite cache for Airtable**
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/airboost?referralCode=3Ri9K9)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/aircache?referralCode=3Ri9K9)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Bun](https://img.shields.io/badge/Bun-1.0+-black.svg)](https://bun.sh)
 
@@ -45,7 +45,7 @@ Airboost solves this by caching your Airtable data locally in SQLite, giving you
 
 ### Option 1: Deploy to Railway (Recommended)
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/airboost?referralCode=3Ri9K9)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/aircache?referralCode=3Ri9K9)
 
 1. Click the deploy button
 2. Add your Airtable credentials
@@ -205,7 +205,7 @@ Airboost uses a **dual-database strategy** for zero-downtime updates:
 
 One-click deployment with automatic SSL and scaling:
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/airboost?referralCode=3Ri9K9)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/aircache?referralCode=3Ri9K9)
 
 **Cost:** ~$2-5/month for typical usage
 

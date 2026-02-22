@@ -10,7 +10,7 @@ Get Airboost running in under 5 minutes.
 
 ## Option 1: Deploy to Railway (Fastest)
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/airboost?referralCode=3Ri9K9)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/aircache?referralCode=3Ri9K9)
 
 1. Click the deploy button
 2. Set your environment variables:
