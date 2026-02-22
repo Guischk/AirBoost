@@ -1,5 +1,5 @@
 /**
- * 🚀 Elysia Application for Aircache
+ * 🚀 Elysia Application for Airboost
  * Main application setup with routes and middleware
  */
 
@@ -34,7 +34,7 @@ export function createApp(worker?: Worker) {
 			swagger({
 				documentation: {
 					info: {
-						title: "Aircache API",
+						title: "Airboost API",
 						version: "0.2.0",
 						description: "High-performance Airtable cache service built with SQLite and Bun",
 					},

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * Tests de performance pour Aircache
+ * Tests de performance pour Airboost
  * Benchmarks et tests de charge
  */
 

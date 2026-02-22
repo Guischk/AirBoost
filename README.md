@@ -133,22 +133,36 @@ All endpoints require Bearer token authentication (except `/health`).
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/types` | GET | Auto-generated TypeScript types |
-| `/api/mappings` | GET | Field name mappings |
-| `/api/attachments/:table/:record/:field/:filename` | GET | Serve cached attachments |
+| `/api/types` | GET | Auto-generated TypeScript types (`?format=json` for JSON) |
+| `/api/mappings` | GET | List all table name mappings |
+| `/api/mappings/:identifier` | GET | Get a specific mapping by ID or name |
+| `/api/attachments/:table` | GET | List attachments for a table |
+| `/api/attachments/:table/:record` | GET | List attachments for a record |
+| `/api/attachments/:table/:record/:field` | GET | List attachments for a field |
+| `/api/attachments/:table/:record/:field/:filename` | GET | Download a cached attachment |
+| `/api/attachments/by-id/:id` | GET | Get attachment metadata by ID |
+
+### Webhooks
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/webhooks/airtable/refresh` | POST | Receive Airtable webhook notifications (HMAC-validated) |
 
 ### Query Parameters
 
 ```bash
 # Pagination
-GET /api/tables/users?page=1&limit=50
+GET /api/tables/users?page=1&pageSize=50
 
-# Field selection
-GET /api/tables/users?fields=name,email
+# Filter by modification date
+GET /api/tables/users?modifiedAfter=2025-01-01T00:00:00Z
+
+# Filter records
+GET /api/tables/users?filter=active
 
 # Example with curl
 curl -H "Authorization: Bearer your_token" \
-  "https://your-airboost.com/api/tables/users?limit=10"
+  "https://your-airboost.com/api/tables/users?pageSize=10"
 ```
 
 ## Architecture

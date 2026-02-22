@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * Tests de sécurité pour Aircache
+ * Tests de sécurité pour Airboost
  * Vérification des vulnérabilités et de la protection
  */
 
@@ -194,10 +194,10 @@ describe("Security Tests", () => {
 	describe("Input Validation Tests", () => {
 		test("should validate query parameters", async () => {
 			const invalidParams = [
-				"?limit=-1",
-				"?limit=10000",
-				"?offset=-1",
-				"?fields=invalid,field,names",
+				"?pageSize=-1",
+				"?pageSize=10000",
+				"?page=-1",
+				"?filter=<script>alert(1)</script>",
 			];
 
 			for (const param of invalidParams) {
@@ -207,7 +207,7 @@ describe("Security Tests", () => {
 		});
 
 		test("should validate pagination parameters", async () => {
-			const result = await apiRequest("/api/tables?limit=10000&offset=-1");
+			const result = await apiRequest("/api/tables?pageSize=10000&page=-1");
 			expect([400, 401, 500, 200]).toContain(result.status);
 		});
 	});

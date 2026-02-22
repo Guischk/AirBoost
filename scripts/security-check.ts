@@ -81,7 +81,7 @@ async function checkFile(filePath: string): Promise<SecurityIssue[]> {
 }
 
 async function runSecurityCheck(): Promise<void> {
-  console.log("🔒 Security Check - Aircache");
+  console.log("🔒 Security Check - Airboost");
   console.log("===================================");
 
   const allIssues: SecurityIssue[] = [];

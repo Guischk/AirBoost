@@ -164,7 +164,7 @@ class SQLiteVsAirtableBenchmark {
 					try {
 						const normalizedTableName = normalizeKey(tableName);
 						const response = await fetch(
-							`${API_BASE}api/tables/${encodeURIComponent(normalizedTableName)}?limit=1`,
+							`${API_BASE}api/tables/${encodeURIComponent(normalizedTableName)}?pageSize=1`,
 							{
 								headers: {
 									Authorization: `Bearer ${BEARER_TOKEN}`,
@@ -190,7 +190,7 @@ class SQLiteVsAirtableBenchmark {
 					try {
 						const normalizedTableName = normalizeKey(tableName);
 						const response = await fetch(
-							`${API_BASE}api/tables/${encodeURIComponent(normalizedTableName)}?limit=10`,
+							`${API_BASE}api/tables/${encodeURIComponent(normalizedTableName)}?pageSize=10`,
 							{
 								headers: {
 									Authorization: `Bearer ${BEARER_TOKEN}`,
@@ -216,7 +216,7 @@ class SQLiteVsAirtableBenchmark {
 					try {
 						const normalizedTableName = normalizeKey(tableName);
 						const response = await fetch(
-							`${API_BASE}api/tables/${encodeURIComponent(normalizedTableName)}?limit=50`,
+							`${API_BASE}api/tables/${encodeURIComponent(normalizedTableName)}?pageSize=50`,
 							{
 								headers: {
 									Authorization: `Bearer ${BEARER_TOKEN}`,
@@ -242,7 +242,7 @@ class SQLiteVsAirtableBenchmark {
 					try {
 						const normalizedTableName = normalizeKey(tableName);
 						const response = await fetch(
-							`${API_BASE}api/tables/${encodeURIComponent(normalizedTableName)}?limit=1000`,
+							`${API_BASE}api/tables/${encodeURIComponent(normalizedTableName)}?pageSize=1000`,
 							{
 								headers: {
 									Authorization: `Bearer ${BEARER_TOKEN}`,

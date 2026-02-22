@@ -1,6 +1,6 @@
 {
 	"name": "Airboost",
-	"description": "High-performance Airtable cache service - 3.2x faster with zero-downtime updates",
+	"description": "High-performance Airtable cache service - 240x faster with zero-downtime updates",
 	"icon": "🚀",
 	"template": {
 		"repo": "https://github.com/guischk/airboost",
@@ -74,7 +74,7 @@
 		]
 	},
 	"features": [
-		"✅ 3.2x faster than direct Airtable API calls",
+		"✅ 240x faster than direct Airtable API calls",
 		"✅ Zero-downtime cache updates",
 		"✅ Automatic attachment downloading",
 		"✅ Built-in health monitoring",

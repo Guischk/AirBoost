@@ -1,5 +1,5 @@
 /**
- * 🚀 Elysia-based API server for Aircache
+ * 🚀 Elysia-based API server for Airboost
  * Provides REST endpoints for cached Airtable data using Elysia framework
  */
 

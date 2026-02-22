@@ -12,8 +12,7 @@ healthcheckTimeout = 10
 
 # Persistent storage for SQLite databases and attachments
 volumes = [
-  { source = "/app/data", target = "/app/data" },
-  { source = "/app/storage", target = "/app/storage" }
+  { source = "/app/data", target = "/app/data" }
 ]
 
 # Port configuration
@@ -28,7 +27,7 @@ REFRESH_INTERVAL = "86400"  # 24 hours
 CACHE_TTL = "86400"        # 24 hours
 # Storage paths with persistent volumes
 SQLITE_PATH = "/app/data"
-STORAGE_PATH = "/app/storage/attachments"
+STORAGE_PATH = "/app/data/attachments"
 ENABLE_ATTACHMENT_DOWNLOAD = "true"
 # Security (set in Railway UI)
 # AIRTABLE_PERSONAL_TOKEN = "${AIRTABLE_PERSONAL_TOKEN}"
@@ -43,7 +42,7 @@ REFRESH_INTERVAL = "3600"   # 1 hour
 CACHE_TTL = "3600"         # 1 hour
 # Isolated storage paths
 SQLITE_PATH = "/app/data/staging"
-STORAGE_PATH = "/app/storage/staging"
+STORAGE_PATH = "/app/data/staging/attachments"
 ENABLE_ATTACHMENT_DOWNLOAD = "true"
 # Security (set in Railway UI)
 # AIRTABLE_PERSONAL_TOKEN = "${AIRTABLE_PERSONAL_TOKEN}"

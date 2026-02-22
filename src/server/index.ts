@@ -1,5 +1,5 @@
 /**
- * Main server entry point for Aircache
+ * Main server entry point for Airboost
  * SQLite-only caching service configuration
  */
 

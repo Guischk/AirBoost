@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 
 /**
- * Quick demonstration of the Aircache system
+ * Quick demonstration of the Airboost system
  */
 
 const API_BASE = "http://localhost:3000";
 const BEARER_TOKEN = process.env.BEARER_TOKEN || "demo-token";
 
-console.log("🎯 Aircache Demonstration");
+console.log("🎯 Airboost Demonstration");
 console.log("================================");
 
 // Connectivity test

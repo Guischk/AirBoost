@@ -82,7 +82,7 @@ export class AirtableWebhookClient {
 	}
 
 	/**
-	 * Create a new webhook pointing to Aircache
+	 * Create a new webhook pointing to Airboost
 	 */
 	async createWebhook(notificationUrl: string): Promise<CreateWebhookResponse> {
 		const url = `${this.apiUrl}/bases/${this.baseId}/webhooks`;
@@ -242,7 +242,7 @@ export class AirtableWebhookClient {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					"User-Agent": "Aircache-Webhook-Verify/1.0",
+					"User-Agent": "Airboost-Webhook-Verify/1.0",
 				},
 				body: JSON.stringify({ test: true }),
 				signal: AbortSignal.timeout(5000), // 5 second timeout

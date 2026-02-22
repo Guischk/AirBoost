@@ -74,7 +74,7 @@ BEARER_TOKEN=your-bearer-token
 SQLITE_V1_PATH=/app/data/airboost-v1.sqlite
 SQLITE_V2_PATH=/app/data/airboost-v2.sqlite
 SQLITE_METADATA_PATH=/app/data/metadata.sqlite
-STORAGE_PATH=/app/storage/attachments
+STORAGE_PATH=/app/data/attachments
 REFRESH_INTERVAL=86400
 CACHE_TTL=86400
 NODE_ENV=production
@@ -114,7 +114,7 @@ curl -H "Authorization: Bearer $BEARER_TOKEN" \
 
 ### 2. Railway Logs
 - Monitor startup logs
-- Verify creation of `/app/data` and `/app/storage` folders
+- Verify creation of `/app/data` folder
 - Confirm SQLite connection
 - Observe the first refresh
 
@@ -140,7 +140,7 @@ curl -H "Authorization: Bearer $BEARER_TOKEN" \
 # Airtable files are now:
 # - Automatically detected
 # - Downloaded during refresh
-# - Stored in /app/storage/attachments
+# - Stored in /app/data/attachments
 # - Served via /api/attachments/:id
 ```
 
@@ -168,7 +168,7 @@ curl -H "Authorization: Bearer $BEARER_TOKEN" \
 ```bash
 # If problems occur, check:
 ls -la /app/data/        # SQLite files created?
-ls -la /app/storage/     # Attachments folder created?
+ls -la /app/data/attachments/  # Attachments folder created?
 cat /app/data/airboost-v1.sqlite # DB v1 not empty?
 cat /app/data/airboost-v2.sqlite # DB v2 not empty?
 

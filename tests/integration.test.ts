@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * Tests d'intégration complets pour Aircache
+ * Tests d'intégration complets pour Airboost
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";

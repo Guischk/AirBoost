@@ -65,7 +65,7 @@ WEBHOOK_AUTO_SETUP=false
 # Configuration
 AIRTABLE_TOKEN="pat_your_token"
 BASE_ID="app_your_base_id"
-AIRCACHE_URL="https://airboost.yourcompany.com"
+WEBHOOK_PUBLIC_URL="https://airboost.yourcompany.com"
 WEBHOOK_SECRET="your_secret_here"
 
 # Create webhook
@@ -73,7 +73,7 @@ curl -X POST "https://api.airtable.com/v0/bases/${BASE_ID}/webhooks" \
   -H "Authorization: Bearer ${AIRTABLE_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{
-    \"notificationUrl\": \"${AIRCACHE_URL}/webhooks/airtable/refresh\",
+    \"notificationUrl\": \"${WEBHOOK_PUBLIC_URL}/webhooks/airtable/refresh\",
     \"specification\": {
       \"options\": {
         \"filters\": {

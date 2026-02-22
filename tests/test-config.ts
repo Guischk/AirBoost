@@ -1,5 +1,5 @@
 /**
- * Configuration for all Aircache tests
+ * Configuration for all Airboost tests
  */
 
 export const TEST_CONFIG = {

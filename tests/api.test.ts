@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * Suite de tests complète pour l'API Aircache
+ * Suite de tests complète pour l'API Airboost
  * Tests unitaires et d'intégration pour tous les endpoints
  */
 
@@ -175,7 +175,7 @@ afterAll(async () => {
 	}
 });
 
-describe("Aircache API Tests", () => {
+describe("Airboost API Tests", () => {
 	describe("Health Check (No Auth)", () => {
 		test("should return healthy status", async () => {
 			const result = await apiRequest<HealthResponse>("/health", {
