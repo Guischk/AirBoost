@@ -29,24 +29,26 @@ export const bearerAuth = new Elysia({ name: "bearerAuth" })
 			throw new Error("Unauthorized");
 		}
 
-		// Use Bun's native timingSafeEqual (or create a Buffer comparison if needed)
-		const expectedBuffer = Buffer.from(bearerToken);
-		const providedBuffer = Buffer.from(bearer);
+		// Constant-time token comparison to prevent timing attacks.
+		// Pad both inputs to the same length before timingSafeEqual so that
+		// an attacker cannot learn the expected token length via response timing.
+		const expectedBytes = new TextEncoder().encode(bearerToken);
+		const providedBytes = new TextEncoder().encode(bearer);
 
-		if (expectedBuffer.length !== providedBuffer.length) {
-			set.status = 401;
-			throw new Error("Unauthorized");
-		}
+		const maxLen = Math.max(expectedBytes.length, providedBytes.length);
+		const paddedExpected = new Uint8Array(maxLen);
+		const paddedProvided = new Uint8Array(maxLen);
+		paddedExpected.set(expectedBytes);
+		paddedProvided.set(providedBytes);
 
-		// Timing safe comparison to prevent timing attacks
-		// Using Bun.crypto if available or node:crypto
 		const crypto = await import("node:crypto");
 		const isValid = crypto.timingSafeEqual(
-			new Uint8Array(expectedBuffer),
-			new Uint8Array(providedBuffer),
+			new Uint8Array(paddedExpected),
+			new Uint8Array(paddedProvided),
 		);
 
-		if (!isValid) {
+		// Reject if original lengths differ OR comparison fails
+		if (expectedBytes.length !== providedBytes.length || !isValid) {
 			set.status = 401;
 			throw new Error("Unauthorized");
 		}

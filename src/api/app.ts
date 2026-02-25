@@ -1,10 +1,11 @@
 /**
- * 🚀 Elysia Application for Airboost
+ * Elysia Application for Airboost
  * Main application setup with routes and middleware
  */
 
 import { swagger } from "@elysiajs/swagger";
 import { cors } from "@elysiajs/cors";
+import { randomUUID } from "node:crypto";
 import { Elysia } from "elysia";
 import { config } from "../config";
 import { loggers } from "../lib/logger";
@@ -29,27 +30,29 @@ const log = loggers.api;
  */
 export function createApp(worker?: Worker) {
 	const app = new Elysia()
-		// 🧩 Swagger Documentation
+		// 🧩 Swagger Documentation (Protected in production)
 		.use(
-			swagger({
-				documentation: {
-					info: {
-						title: "Airboost API",
-						version: "0.2.0",
-						description: "High-performance Airtable cache service built with SQLite and Bun",
-					},
-					security: [{ BearerAuth: [] }],
-					components: {
-						securitySchemes: {
-							BearerAuth: {
-								type: "http",
-								scheme: "bearer",
+			config.isDev || config.enableDocs
+				? swagger({
+						documentation: {
+							info: {
+								title: "Airboost API",
+								version: "0.2.0",
+								description: "High-performance Airtable cache service built with SQLite and Bun",
+							},
+							security: [{ BearerAuth: [] }],
+							components: {
+								securitySchemes: {
+									BearerAuth: {
+										type: "http",
+										scheme: "bearer",
+									},
+								},
 							},
 						},
-					},
-				},
-				path: "/docs",
-			}),
+						path: "/docs",
+					})
+				: (app) => app,
 		)
 
 		// 🌐 CORS
@@ -96,9 +99,16 @@ export function createApp(worker?: Worker) {
 
 			log.error(`API Error [${code}]:`, error);
 			set.status = 500;
+
+			// In production, never expose internal error details to the client.
+			// Log with a request ID so errors can be correlated in the logs.
+			const requestId = randomUUID();
+			log.error(`[${requestId}] Unhandled error:`, error);
 			return {
 				error: "Internal Server Error",
-				message: error instanceof Error ? error.message : "Unknown error",
+				...(config.isDev
+					? { message: error instanceof Error ? error.message : "Unknown error" }
+					: { requestId }),
 				backend: "sqlite",
 			};
 		})
