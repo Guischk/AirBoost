@@ -9,6 +9,9 @@ export interface Config {
 	// Server settings
 	port: number;
 
+	// Environment
+	isDev: boolean;
+
 	// Airtable settings
 	airtableToken: string;
 	airtableBaseId: string;
@@ -16,6 +19,9 @@ export interface Config {
 	// API settings
 	bearerToken: string;
 	authDisabled: boolean;
+
+	// Docs settings
+	enableDocs: boolean;
 
 	// Sync mode settings
 	syncMode: SyncMode;
@@ -52,6 +58,8 @@ export function loadConfig(): Config {
 	const airtableBaseId = process.env.AIRTABLE_BASE_ID;
 	const bearerToken = process.env.BEARER_TOKEN?.trim();
 	const authDisabled = process.env.AUTH_DISABLED === "true";
+	const isDev = process.env.NODE_ENV !== "production";
+	const enableDocs = process.env.ENABLE_DOCS === "true";
 
 	if (!airtableToken || !airtableBaseId) {
 		throw new Error(
@@ -121,6 +129,10 @@ export function loadConfig(): Config {
 		// Logger settings
 		logLevel: Number.parseInt(process.env.CONSOLA_LEVEL || "3"), // 3 = info level
 		logFancy: process.env.CONSOLA_FANCY !== "false", // Default to true
+
+		// Dev/Docs settings
+		isDev,
+		enableDocs,
 	};
 }
 
