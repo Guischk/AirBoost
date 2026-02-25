@@ -8,8 +8,9 @@ import { SQLiteBackend } from "./backends/sqlite-backend";
 const logger = loggers.worker;
 
 export interface WorkerMessage {
-	type: "refresh:start" | "refresh:stop" | "stats:get";
+	type: "refresh:start" | "refresh:stop" | "stats:get" | "webhook:received";
 	manual?: boolean;
+	payload?: Record<string, unknown>;
 }
 
 export interface WorkerResponse {
@@ -44,8 +45,53 @@ class SQLiteWorker {
 				await this.handleStatsGet();
 				break;
 
+			case "webhook:received":
+				await this.handleWebhookReceived(message.payload);
+				break;
+
 			default:
 				logger.warn("Unknown message type", message);
+		}
+	}
+
+	private async handleWebhookReceived(payload?: Record<string, unknown>): Promise<void> {
+		if (!payload) {
+			logger.warn("webhook:received with no payload, ignoring");
+			return;
+		}
+
+		try {
+			// Extract changedTablesById from the Airtable webhook payload
+			// Airtable sends: { base, webhook, timestamp, changedTablesById, ... }
+			const changedTablesById = payload.changedTablesById as
+				| {
+						[tableId: string]: {
+							createdRecordsById?: { [recordId: string]: null };
+							changedRecordsById?: { [recordId: string]: null };
+							destroyedRecordIds?: string[];
+						};
+				  }
+				| undefined;
+
+			if (!changedTablesById || Object.keys(changedTablesById).length === 0) {
+				logger.info("webhook:received — no changed tables, skipping incremental refresh");
+				return;
+			}
+
+			logger.start("Starting incremental refresh from webhook");
+			const stats = await this.backend.incrementalRefresh(changedTablesById);
+			logger.success("Incremental refresh completed", stats);
+
+			this.postMessage({
+				type: "refresh:done",
+				stats,
+			});
+		} catch (error) {
+			logger.error("Error during incremental refresh", error);
+			this.postMessage({
+				type: "refresh:error",
+				error: error instanceof Error ? error.message : "Unknown error",
+			});
 		}
 	}
 

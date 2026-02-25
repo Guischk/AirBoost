@@ -140,10 +140,13 @@ export async function generateMappingsFile(): Promise<void> {
 }
 
 /**
- * Sync mappings to SQLite databases (v1 and v2)
+ * Sync mappings to SQLite metadata database
+ *
+ * Mappings are stored in the metadata DB (not v1/v2 data DBs) so they survive
+ * version flips during full refreshes.
  */
 export async function syncMappingsToDatabase(): Promise<void> {
-	logger.start("Syncing mappings to SQLite databases...");
+	logger.start("Syncing mappings to SQLite metadata database...");
 
 	// Read mappings file
 	const mappingsFile = Bun.file("./src/lib/airtable/mappings.json");
@@ -161,24 +164,14 @@ export async function syncMappingsToDatabase(): Promise<void> {
 	// Ensure databases are initialized
 	await sqliteService.connect();
 
-	// Sync to both v1 and v2 databases
 	let syncedCount = 0;
 
-	for (const [tableId, tableData] of Object.entries(mappingsData.tables)) {
-		// Sync to both databases (with null checks)
-		const v1Db = sqliteService.v1Db;
-		const v2Db = sqliteService.v2Db;
-
-		if (!v1Db || !v2Db) {
-			throw new Error("Database initialization failed");
-		}
-
-		await sqliteService.upsertTableMapping(v1Db, tableData);
-		await sqliteService.upsertTableMapping(v2Db, tableData);
+	for (const [, tableData] of Object.entries(mappingsData.tables)) {
+		await sqliteService.upsertTableMapping(tableData);
 		syncedCount++;
 	}
 
-	logger.success("Synced table mappings to both databases", {
+	logger.success("Synced table mappings to metadata database", {
 		count: syncedCount,
 	});
 }

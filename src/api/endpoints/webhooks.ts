@@ -135,7 +135,7 @@ export const webhooks = new Elysia({ prefix: "/webhooks" }).post(
 
 		// Forward payload to worker
 		worker.postMessage({
-			type: "WEBHOOK_RECEIVED",
+			type: "webhook:received",
 			payload: body,
 		});
 

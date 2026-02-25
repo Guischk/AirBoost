@@ -189,6 +189,29 @@ class SQLiteService {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+		// Table for metadata mappings (table ID to names)
+		// Stored in metadata DB so it survives v1/v2 version flips
+		db.run(`
+      CREATE TABLE IF NOT EXISTS metadata_mappings (
+        table_id TEXT PRIMARY KEY,
+        table_name_original TEXT NOT NULL,
+        table_name_normalized TEXT NOT NULL,
+        primary_field_id TEXT NOT NULL,
+        fields_mapping TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(table_name_original),
+        UNIQUE(table_name_normalized)
+      )
+    `);
+
+		db.run(
+			`CREATE INDEX IF NOT EXISTS idx_mm_table_name_original ON metadata_mappings(table_name_original)`,
+		);
+		db.run(
+			`CREATE INDEX IF NOT EXISTS idx_mm_table_name_normalized ON metadata_mappings(table_name_normalized)`,
+		);
 	}
 
 	/**
@@ -237,35 +260,12 @@ class SQLiteService {
 
 		// Table for locks (in each database to avoid conflicts)
 		db.run(`
-      CREATE TABLE IF NOT EXISTS locks (
-        name TEXT PRIMARY KEY,
-        lock_id TEXT NOT NULL,
-        expires_at DATETIME NOT NULL
-      )
-    `);
-
-		// Table for metadata mappings (table ID to names)
-		db.run(`
-      CREATE TABLE IF NOT EXISTS metadata_mappings (
-        table_id TEXT PRIMARY KEY,
-        table_name_original TEXT NOT NULL,
-        table_name_normalized TEXT NOT NULL,
-        primary_field_id TEXT NOT NULL,
-        fields_mapping TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(table_name_original),
-        UNIQUE(table_name_normalized)
-      )
-    `);
-
-		// Indexes for mapping lookups
-		db.run(
-			`CREATE INDEX IF NOT EXISTS idx_table_name_original ON metadata_mappings(table_name_original)`,
-		);
-		db.run(
-			`CREATE INDEX IF NOT EXISTS idx_table_name_normalized ON metadata_mappings(table_name_normalized)`,
-		);
+		  CREATE TABLE IF NOT EXISTS locks (
+		    name TEXT PRIMARY KEY,
+		    lock_id TEXT NOT NULL,
+		    expires_at DATETIME NOT NULL
+		  )
+		`);
 
 		logger.success("Data schema initialized");
 	}
@@ -310,58 +310,67 @@ class SQLiteService {
 		const id = `${tableNorm}:${recordId}`;
 		const dataStr = JSON.stringify(data);
 
-		await this.transactionOn(db, async () => {
+		// Extract attachments BEFORE the transaction (async work must be outside sync transaction)
+		const { extractAttachments } = await import("./schema-generator");
+		const attachments = extractAttachments(recordId, data);
+
+		// Resolve existing download info BEFORE the transaction
+		type ExistingInfo = { local_path: string; downloaded_at: string };
+		const resolvedAttachments: Array<{
+			attachment: ReturnType<typeof extractAttachments>[number];
+			localPath: string | null;
+			downloadedAt: string | null;
+		}> = [];
+
+		if (attachments.length > 0) {
+			const existingStmt = db.prepare(`
+        SELECT local_path, downloaded_at FROM attachments
+        WHERE original_url = ? AND local_path IS NOT NULL AND downloaded_at IS NOT NULL
+        LIMIT 1
+      `);
+
+			for (const attachment of attachments) {
+				const existing = existingStmt.get(attachment.original_url) as ExistingInfo | undefined;
+				let localPath: string | null = null;
+				let downloadedAt: string | null = null;
+				if (existing) {
+					// Verify the file still exists (async check before transaction)
+					if (await Bun.file(existing.local_path).exists()) {
+						localPath = existing.local_path;
+						downloadedAt = existing.downloaded_at;
+					}
+				}
+				resolvedAttachments.push({ attachment, localPath, downloadedAt });
+			}
+		}
+
+		// All async work is done — now run the synchronous transaction
+		this.transactionOn(db, () => {
 			if (!db) return;
 
 			// Insert/update main record
-			const recordStmt = db.prepare(`
+			db.prepare(
+				`
         INSERT OR REPLACE INTO airtable_records (id, table_name, record_id, data, updated_at)
         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `);
-			recordStmt.run(id, tableNorm, recordId, dataStr);
+      `,
+			).run(id, tableNorm, recordId, dataStr);
 
-			// Handle attachments if present
-			const { extractAttachments } = await import("./schema-generator");
-			const attachments = extractAttachments(recordId, data);
-
-			if (attachments.length > 0) {
+			if (resolvedAttachments.length > 0) {
 				// Delete old attachments for this record
-				const deleteStmt = db.prepare(`
+				db.prepare(
+					`
           DELETE FROM attachments WHERE table_name = ? AND record_id = ?
-        `);
-				deleteStmt.run(tableNorm, recordId);
+        `,
+				).run(tableNorm, recordId);
 
-				// Insert new attachments, preserving download info if attachment already exists
 				const insertStmt = db.prepare(`
           INSERT OR REPLACE INTO attachments
           (id, table_name, record_id, field_name, original_url, filename, size, type, local_path, downloaded_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
-				// Check for existing attachments with same URL to preserve download info
-				const existingStmt = db.prepare(`
-          SELECT local_path, downloaded_at FROM attachments
-          WHERE original_url = ? AND local_path IS NOT NULL AND downloaded_at IS NOT NULL
-          LIMIT 1
-        `);
-
-				for (const attachment of attachments) {
-					// Check if this URL already exists with download info
-					const existing = existingStmt.get(attachment.original_url) as
-						| { local_path: string; downloaded_at: string }
-						| undefined;
-
-					// Verify the file still exists if we have download info
-					let localPath = null;
-					let downloadedAt = null;
-					if (existing) {
-						const localFile = Bun.file(existing.local_path);
-						if (await localFile.exists()) {
-							localPath = existing.local_path;
-							downloadedAt = existing.downloaded_at;
-						}
-					}
-
+				for (const { attachment, localPath, downloadedAt } of resolvedAttachments) {
 					insertStmt.run(
 						attachment.id,
 						tableNorm,
@@ -406,76 +415,85 @@ class SQLiteService {
 			targetDb: dbPath,
 		});
 
-		await this.transactionOn(db, async () => {
-			if (!db) return;
+		// Import extractAttachments BEFORE the transaction (dynamic import is async)
+		const { extractAttachments } = await import("./schema-generator");
 
-			// Prepare statements once for the batch
-			const recordStmt = db.prepare(`
-        INSERT OR REPLACE INTO airtable_records (id, table_name, record_id, data, updated_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `);
+		// Resolve all attachment info BEFORE the transaction (file-system checks are async)
+		type ExistingInfo = { local_path: string; downloaded_at: string };
+		const existingAttachmentStmt = db.prepare(`
+      SELECT local_path, downloaded_at FROM attachments
+      WHERE original_url = ? AND local_path IS NOT NULL AND downloaded_at IS NOT NULL
+      LIMIT 1
+    `);
 
-			const deleteAttachmentStmt = db.prepare(`
-        DELETE FROM attachments WHERE table_name = ? AND record_id = ?
-      `);
+		type ResolvedRecord = {
+			compositeId: string;
+			recordId: string;
+			dataStr: string;
+			resolvedAttachments: Array<{
+				attachment: ReturnType<typeof extractAttachments>[number];
+				localPath: string | null;
+				downloadedAt: string | null;
+			}>;
+		};
 
-			const insertAttachmentStmt = db.prepare(`
-        INSERT OR REPLACE INTO attachments
-        (id, table_name, record_id, field_name, original_url, filename, size, type, local_path, downloaded_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+		const resolvedRecords: ResolvedRecord[] = [];
 
-			const existingAttachmentStmt = db.prepare(`
-        SELECT local_path, downloaded_at FROM attachments
-        WHERE original_url = ? AND local_path IS NOT NULL AND downloaded_at IS NOT NULL
-        LIMIT 1
-      `);
+		for (const record of records) {
+			const compositeId = `${tableNorm}:${record.id}`;
+			const dataStr = JSON.stringify(record.fields);
 
-			// Import extractAttachments once for the batch
-			const { extractAttachments } = await import("./schema-generator");
+			logger.debug("Inserting record into SQLite", {
+				id: compositeId,
+				tableNorm,
+				recordId: record.id,
+				dataLength: dataStr.length,
+				dataSample: dataStr.substring(0, 200),
+			});
 
-			// Process each record in the batch
-			for (const record of records) {
-				const id = `${tableNorm}:${record.id}`;
-				const dataStr = JSON.stringify(record.fields);
+			const attachments = extractAttachments(record.id, record.fields);
+			const resolvedAttachments: ResolvedRecord["resolvedAttachments"] = [];
 
-				// Log each record being inserted (debug level for verbose output)
-				logger.debug("Inserting record into SQLite", {
-					id,
-					tableNorm,
-					recordId: record.id,
-					dataLength: dataStr.length,
-					dataSample: dataStr.substring(0, 200),
-				});
+			for (const attachment of attachments) {
+				const existing = existingAttachmentStmt.get(attachment.original_url) as
+					| ExistingInfo
+					| undefined;
+				let localPath: string | null = null;
+				let downloadedAt: string | null = null;
+				if (existing && (await Bun.file(existing.local_path).exists())) {
+					localPath = existing.local_path;
+					downloadedAt = existing.downloaded_at;
+				}
+				resolvedAttachments.push({ attachment, localPath, downloadedAt });
+			}
 
-				// Insert/update main record
-				recordStmt.run(id, tableNorm, record.id, dataStr);
+			resolvedRecords.push({ compositeId, recordId: record.id, dataStr, resolvedAttachments });
+		}
 
-				// Handle attachments if present
-				const attachments = extractAttachments(record.id, record.fields);
+		// All async work is done — now run the synchronous transaction
+		const recordStmt = db.prepare(`
+      INSERT OR REPLACE INTO airtable_records (id, table_name, record_id, data, updated_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
 
-				if (attachments.length > 0) {
-					// Delete old attachments for this record
-					deleteAttachmentStmt.run(tableNorm, record.id);
+		const deleteAttachmentStmt = db.prepare(`
+      DELETE FROM attachments WHERE table_name = ? AND record_id = ?
+    `);
 
-					// Insert new attachments
-					for (const attachment of attachments) {
-						// Check if this URL already exists with download info
-						const existing = existingAttachmentStmt.get(attachment.original_url) as
-							| { local_path: string; downloaded_at: string }
-							| undefined;
+		const insertAttachmentStmt = db.prepare(`
+      INSERT OR REPLACE INTO attachments
+      (id, table_name, record_id, field_name, original_url, filename, size, type, local_path, downloaded_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-						// Verify the file still exists if we have download info
-						let localPath = null;
-						let downloadedAt = null;
-						if (existing) {
-							const localFile = Bun.file(existing.local_path);
-							if (await localFile.exists()) {
-								localPath = existing.local_path;
-								downloadedAt = existing.downloaded_at;
-							}
-						}
+		this.transactionOn(db, () => {
+			for (const { compositeId, recordId, dataStr, resolvedAttachments } of resolvedRecords) {
+				recordStmt.run(compositeId, tableNorm, recordId, dataStr);
 
+				if (resolvedAttachments.length > 0) {
+					deleteAttachmentStmt.run(tableNorm, recordId);
+
+					for (const { attachment, localPath, downloadedAt } of resolvedAttachments) {
 						insertAttachmentStmt.run(
 							attachment.id,
 							tableNorm,
@@ -682,7 +700,7 @@ class SQLiteService {
 	async clearInactiveDatabase(): Promise<void> {
 		if (!this.inactiveDb) throw new Error("Inactive database not connected");
 
-		await this.transactionOn(this.inactiveDb, async () => {
+		this.transactionOn(this.inactiveDb, () => {
 			if (!this.inactiveDb) return;
 			this.inactiveDb.run(`DELETE FROM airtable_records`);
 			this.inactiveDb.run(`DELETE FROM attachments`);
@@ -702,17 +720,12 @@ class SQLiteService {
 	/**
 	 * Set active version in metadata
 	 */
-	private async setActiveVersionInMetadata(version: ActiveVersion): Promise<void> {
-		const metadataDb = new Database(this.metadataPath);
-		try {
-			const stmt = metadataDb.prepare(`
-        UPDATE active_version SET version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
-      `);
-			stmt.run(version);
-			logger.info(`Active version switched to: ${version}`);
-		} finally {
-			metadataDb.close();
-		}
+	private setActiveVersionInMetadata(version: ActiveVersion): void {
+		if (!this.metadataDb) throw new Error("Metadata database not connected");
+		this.metadataDb
+			.prepare(`UPDATE active_version SET version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1`)
+			.run(version);
+		logger.info(`Active version switched to: ${version}`);
 	}
 
 	/**
@@ -729,7 +742,7 @@ class SQLiteService {
 		const newActive = await this.getInactiveVersion();
 
 		// Write to metadata
-		await this.setActiveVersionInMetadata(newActive);
+		this.setActiveVersionInMetadata(newActive);
 
 		// Switch memory pointers
 		this.currentActive = newActive;
@@ -907,7 +920,7 @@ class SQLiteService {
 	/**
 	 * Transaction on the active database
 	 */
-	async transaction<T>(fn: () => T): Promise<T> {
+	transaction<T>(fn: () => T): T {
 		if (!this.activeDb) throw new Error("Database not connected");
 		const txn = this.activeDb.transaction(fn);
 		return txn();
@@ -916,7 +929,7 @@ class SQLiteService {
 	/**
 	 * Transaction on a specific database
 	 */
-	async transactionOn<T>(db: Database, fn: () => T): Promise<T> {
+	transactionOn<T>(db: Database, fn: () => T): T {
 		const txn = db.transaction(fn);
 		return txn();
 	}
@@ -930,20 +943,17 @@ class SQLiteService {
 
 		const id = `${tableNorm}:${recordId}`;
 
-		await this.transactionOn(db, async () => {
+		this.transactionOn(db, () => {
 			if (!db) return;
 
 			// Supprimer le record principal
-			const recordStmt = db.prepare(`
-        DELETE FROM airtable_records WHERE id = ?
-      `);
-			recordStmt.run(id);
+			db.prepare(`DELETE FROM airtable_records WHERE id = ?`).run(id);
 
 			// Supprimer les attachments associés
-			const attachmentStmt = db.prepare(`
-        DELETE FROM attachments WHERE table_name = ? AND record_id = ?
-      `);
-			attachmentStmt.run(tableNorm, recordId);
+			db.prepare(`DELETE FROM attachments WHERE table_name = ? AND record_id = ?`).run(
+				tableNorm,
+				recordId,
+			);
 		});
 
 		logger.debug(`Record deleted: ${id}`);
@@ -1136,53 +1146,54 @@ class SQLiteService {
 	// ========================================
 
 	/**
-	 * Upsert table mapping into database
+	 * Upsert table mapping into metadata database.
+	 * Mappings are stored in metadataDb so they survive v1/v2 version flips.
 	 */
-	async upsertTableMapping(
-		db: Database,
-		mapping: {
-			id: string;
-			originalName: string;
-			normalizedName: string;
-			primaryFieldId: string;
-			fields: Record<string, unknown>;
-		},
-	): Promise<void> {
-		const stmt = db.prepare(`
-      INSERT INTO metadata_mappings (
-        table_id, table_name_original, table_name_normalized,
-        primary_field_id, fields_mapping, updated_at
-      ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(table_id) DO UPDATE SET
-        table_name_original = excluded.table_name_original,
-        table_name_normalized = excluded.table_name_normalized,
-        primary_field_id = excluded.primary_field_id,
-        fields_mapping = excluded.fields_mapping,
-        updated_at = CURRENT_TIMESTAMP
-    `);
-
-		stmt.run(
-			mapping.id,
-			mapping.originalName,
-			mapping.normalizedName,
-			mapping.primaryFieldId,
-			JSON.stringify(mapping.fields),
-		);
+	async upsertTableMapping(mapping: {
+		id: string;
+		originalName: string;
+		normalizedName: string;
+		primaryFieldId: string;
+		fields: Record<string, unknown>;
+	}): Promise<void> {
+		if (!this.metadataDb) throw new Error("Metadata database not connected");
+		this.metadataDb
+			.prepare(
+				`
+		  INSERT INTO metadata_mappings (
+		    table_id, table_name_original, table_name_normalized,
+		    primary_field_id, fields_mapping, updated_at
+		  ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		  ON CONFLICT(table_id) DO UPDATE SET
+		    table_name_original = excluded.table_name_original,
+		    table_name_normalized = excluded.table_name_normalized,
+		    primary_field_id = excluded.primary_field_id,
+		    fields_mapping = excluded.fields_mapping,
+		    updated_at = CURRENT_TIMESTAMP
+		`,
+			)
+			.run(
+				mapping.id,
+				mapping.originalName,
+				mapping.normalizedName,
+				mapping.primaryFieldId,
+				JSON.stringify(mapping.fields),
+			);
 	}
 
 	/**
 	 * Get original table name by table ID (for Airtable API calls)
 	 */
 	getOriginalTableNameById(tableId: string): string | null {
-		if (!this.activeDb) return null;
+		if (!this.metadataDb) return null;
 
-		const result = this.activeDb
+		const result = this.metadataDb
 			.prepare(
 				`
-      SELECT table_name_original 
-      FROM metadata_mappings 
-      WHERE table_id = ?
-    `,
+		  SELECT table_name_original 
+		  FROM metadata_mappings 
+		  WHERE table_id = ?
+		`,
 			)
 			.get(tableId) as { table_name_original: string } | undefined;
 
@@ -1193,15 +1204,15 @@ class SQLiteService {
 	 * Get normalized table name by table ID (for SQLite storage)
 	 */
 	getNormalizedTableNameById(tableId: string): string | null {
-		if (!this.activeDb) return null;
+		if (!this.metadataDb) return null;
 
-		const result = this.activeDb
+		const result = this.metadataDb
 			.prepare(
 				`
-      SELECT table_name_normalized 
-      FROM metadata_mappings 
-      WHERE table_id = ?
-    `,
+		  SELECT table_name_normalized 
+		  FROM metadata_mappings 
+		  WHERE table_id = ?
+		`,
 			)
 			.get(tableId) as { table_name_normalized: string } | undefined;
 
@@ -1212,15 +1223,15 @@ class SQLiteService {
 	 * Get original table name by normalized name (for write-back to Airtable)
 	 */
 	getOriginalTableNameByNormalized(normalizedName: string): string | null {
-		if (!this.activeDb) return null;
+		if (!this.metadataDb) return null;
 
-		const result = this.activeDb
+		const result = this.metadataDb
 			.prepare(
 				`
-      SELECT table_name_original 
-      FROM metadata_mappings 
-      WHERE table_name_normalized = ?
-    `,
+		  SELECT table_name_original 
+		  FROM metadata_mappings 
+		  WHERE table_name_normalized = ?
+		`,
 			)
 			.get(normalizedName) as { table_name_original: string } | undefined;
 
@@ -1231,15 +1242,15 @@ class SQLiteService {
 	 * Get table ID by normalized name
 	 */
 	getTableIdByNormalizedName(normalizedName: string): string | null {
-		if (!this.activeDb) return null;
+		if (!this.metadataDb) return null;
 
-		const result = this.activeDb
+		const result = this.metadataDb
 			.prepare(
 				`
-      SELECT table_id 
-      FROM metadata_mappings 
-      WHERE table_name_normalized = ?
-    `,
+		  SELECT table_id 
+		  FROM metadata_mappings 
+		  WHERE table_name_normalized = ?
+		`,
 			)
 			.get(normalizedName) as { table_id: string } | undefined;
 
@@ -1256,16 +1267,16 @@ class SQLiteService {
 		primaryFieldId: string;
 		fields: Record<string, unknown>;
 	}> {
-		if (!this.activeDb) return [];
+		if (!this.metadataDb) return [];
 
-		const rows = this.activeDb
+		const rows = this.metadataDb
 			.prepare(
 				`
-      SELECT table_id, table_name_original, table_name_normalized,
-             primary_field_id, fields_mapping
-      FROM metadata_mappings
-      ORDER BY table_name_original
-    `,
+		  SELECT table_id, table_name_original, table_name_normalized,
+		         primary_field_id, fields_mapping
+		  FROM metadata_mappings
+		  ORDER BY table_name_original
+		`,
 			)
 			.all() as Array<{
 			table_id: string;
@@ -1291,28 +1302,28 @@ class SQLiteService {
 		tableIdOrName: string,
 		fieldId: string,
 	): { id: string; name: string; type: string } | null {
-		if (!this.activeDb) return null;
+		if (!this.metadataDb) return null;
 
 		// Try to find by table ID first
-		let result = this.activeDb
+		let result = this.metadataDb
 			.prepare(
 				`
-      SELECT fields_mapping 
-      FROM metadata_mappings 
-      WHERE table_id = ?
-    `,
+		  SELECT fields_mapping 
+		  FROM metadata_mappings 
+		  WHERE table_id = ?
+		`,
 			)
 			.get(tableIdOrName) as { fields_mapping: string } | undefined;
 
 		// If not found, try by normalized name
 		if (!result) {
-			result = this.activeDb
+			result = this.metadataDb
 				.prepare(
 					`
-        SELECT fields_mapping 
-        FROM metadata_mappings 
-        WHERE table_name_normalized = ?
-      `,
+			  SELECT fields_mapping 
+			  FROM metadata_mappings 
+			  WHERE table_name_normalized = ?
+			`,
 				)
 				.get(tableIdOrName) as { fields_mapping: string } | undefined;
 		}
@@ -1365,14 +1376,18 @@ class SQLiteService {
 			throw new Error("Databases not connected");
 		}
 
-		// Clear both databases
+		// Clear both data databases
 		for (const db of [this.activeDb, this.inactiveDb]) {
-			await this.transactionOn(db, () => {
+			this.transactionOn(db, () => {
 				db.run("DELETE FROM airtable_records");
 				db.run("DELETE FROM attachments");
-				db.run("DELETE FROM metadata_mappings");
 				db.run("DELETE FROM locks");
 			});
+		}
+
+		// Clear mappings from metadata DB (they will be re-synced on next startup)
+		if (this.metadataDb) {
+			this.metadataDb.run("DELETE FROM metadata_mappings");
 		}
 
 		logger.info("All cached data cleared from v1 and v2 databases");
