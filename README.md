@@ -16,6 +16,18 @@
 
 ---
 
+> [!NOTE]
+> **This project is primarily vibe coded.**
+> Most of the codebase was generated with the help of AI coding assistants (GitHub Copilot, Claude, etc.) with limited manual review of every implementation detail. It works well in practice and has a test suite, but be aware of the following before using it in production:
+>
+> - Code quality and edge-case handling may be inconsistent in places
+> - Some architectural decisions were made quickly and may not reflect deep expertise
+> - Security-sensitive code (auth, HMAC validation) has been manually reviewed, but a full audit is recommended before critical deployments
+>
+> Peer reviews, bug reports, and improvements from the community are very welcome.
+
+---
+
 ## Why Airboost?
 
 Airtable is great for managing data, but its API has limitations:
